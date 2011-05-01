@@ -4,7 +4,7 @@ trait Action[-T <: Item] {
   def perform(item: T, gameState: GameState): GameState
 }
 
-object NoAction extends Action[Nothing]() {
+object NoAction extends Action[Nothing] {
   def perform(item: Nothing, state: GameState): GameState = state
 }
 
@@ -18,6 +18,7 @@ trait Item {
   val action: Option[Action[Concrete]]
   
   val pickUpAction: Action[Item] = new Action[Item] {
+    
     def perform(item: Item, state: GameState): GameState = {
       val inventory = item +: state.player.inventory
       val player = state.player.copy(inventory = inventory)
@@ -153,6 +154,7 @@ case class Character(
 class DropAction(character: Character) extends Action[Item] {
 
   def perform(item: Item, state: GameState): GameState = {
+    
     if (!character.inventory.contains(item))
       state.copy(message = Some(character.name +"'s inventory does not contain "+ item))
     else {
@@ -166,14 +168,13 @@ class DropAction(character: Character) extends Action[Item] {
 class OpenDoorAction(door: Door) extends Action[Item] {
   
   def perform(item: Item, state: GameState): GameState = {
-    state.player.keyFor(door) flatMap {
-      key => door match {
-        case Door(_, _, locked)  =>
-          Some(state.copy(map = state.map.unlockDoor(key)))
-        case _ => None
-      }
-    } getOrElse {
-      state.copy(message = Some("Door is locked"))
+    
+    val key = state.player.keyFor(door)
+    door match {
+      case Door(_, _, locked) if (!key.isDefined)  =>
+        state.copy(message = Some("Door is locked"))
+      case _ =>
+        state.copy(map = state.map.unlockDoor(key.get))
     }
   }
 }
@@ -232,7 +233,7 @@ case class GameState(player: Character, map: GameMap, currentArea: Area, message
   }
   
   def start() {
-    printChoices
+    printChoices()
     next()
   }
   
@@ -287,8 +288,10 @@ object Main extends App {
   val monster = Character("ogre", weightCapacity = 10)
   val area1 = Area(items = List(axe))
   val area2 = Area(characters = List(monster))
-  map = map.addDoor(area1 ++ area2)
+  val door = area1 ++ area2
+  map = map.addDoor(door)
   
+  val key = Key("door key", door, 5, "", new MonetaryValue(4))
   
   var player = new Character("Fred")
   val state = GameState(player, map, area1)
